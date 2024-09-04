@@ -7,6 +7,9 @@ fixed/implemented
 
  * only files can be added, not directories
 
+ * once an archive is created, nothing can be added to or
+   removed from it
+
  * symlinks not yet implemented
 
  * binary files may be corrupted when creating/extracting

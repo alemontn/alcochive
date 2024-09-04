@@ -132,13 +132,24 @@ function extract()
     cat "$tmpAr" | tail -n+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
   }
 
+  function _removeChar()
+  {
+    rmLength=$1
+    cat "$tmpAr" | tail -c+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+  }
+
   function _fileSort()
   {
+    declare -i fileCount=0
+
     for length in ${fileLengths[@]}
     do
-      fileDigest "$(cat "$tmpAr" | head -n1)"
+      fileCount+=1
 
+      fileDigest "$(cat "$tmpAr" | head -n1)"
       _removeLine 1
+
+      echo "length=$length" >&2
 
       if [ -n "$dirName" ]
       then
@@ -152,7 +163,7 @@ function extract()
       then
         fatal "$fileName" "cannot write to existing file (use '--overwrite')"
       else
-        cat "$tmpAr" | head -n$length | head -c-1 >"$fileName"
+        cat "$tmpAr" | head -c$length >"$fileName"
       fi
 
       if [ ! "$filePerms" == 0000 ] && [ ! "$setPerms" == false ]
@@ -165,7 +176,8 @@ function extract()
         chown -R "$fileOwner" "$fileName"
       fi
 
-      _removeLine $length
+      _removeChar $length
+      #_removeLine 1
     done
   }
 
@@ -193,7 +205,7 @@ function extract()
 
   _fileSort
 
-  rm -f "$tmpAr"
+  #rm -f "$tmpAr"
 }
 
 function create()
@@ -202,7 +214,7 @@ function create()
 
   function _addFile()
   {
-    fileLength=$(cat "$fileName" | wc -l)
+    fileLength=$(cat "$fileName" | wc -c)
 
     if [ $fileLength -eq 0 ]
     then
@@ -211,7 +223,7 @@ function create()
 
     if ! file - <"$fileName" | grep -qF "text"
     then
-      warn "binary files are not fully supported - expect file corruption"
+      warn "$fileName" "binary files are not fully supported - expect file corruption"
     fi
 
     header+=$fileLength,
