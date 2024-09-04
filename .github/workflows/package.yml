@@ -22,7 +22,7 @@ jobs:
       - name: make bundle
         run: |
           cd ~/alcochive
-          rm -rf build
+          sudo rm -rf build
           ./scripts/package.sh bundle
           mv build/out/alcochive.bundle ~/out
 
