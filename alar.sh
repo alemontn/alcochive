@@ -77,6 +77,11 @@ function headerDigest()
   # remove starting indentifier
   header="${header#alar}"
 
+  # last 64 chars (sha256sum)
+  catSum="${header: -64}"
+  # remove checksum
+  header="${header::-64}"
+
   fileLengths=(${header//,/ })
 }
 
@@ -178,6 +183,14 @@ function extract()
   # long way of removing header but oh well
   _removeLine 1
 
+  arSum="$(cat "$tmpAr" | sha256sum)"
+  arSum="${arSum::64}"
+
+  if [ ! "$arSum" == "$catSum" ]
+  then
+    fatal "corrupted archive" "checksum (sha256) mismatch"
+  fi
+
   _fileSort
 
   rm -f "$tmpAr"
@@ -185,6 +198,8 @@ function extract()
 
 function create()
 {
+  tmpAr="$(mktemp /tmp/alcochive-create-XXXXXXX)"
+
   function _addFile()
   {
     fileLength=$(cat "$fileName" | wc -l)
@@ -236,22 +251,28 @@ function create()
     fatal "cowardly refusing to create an empty archive"
   fi
 
-  header="${header%,}"
-  echo alar"$header"
-
   for fileAdd in "${body[@]}"
   do
     fileName="${fileAdd:4}"
       fileName="${fileName#(*)}"
 
-    echo "$fileAdd"
+    echo "$fileAdd" >>"$tmpAr"
 
     if [ ! "${fileAdd: -1}" == / ]
     then
       # a file
-      cat "$fileName"
+      cat "$fileName" >>"$tmpAr"
     fi
   done
+
+  sum="$(cat "$tmpAr" | sha256sum)"
+  sum="${sum::64}"
+
+  header="${header%,}"
+
+  echo alar"$header$sum"
+  cat "$tmpAr"
+  rm -f "$tmpAr"
 }
 
 function main()

@@ -13,8 +13,6 @@ fixed/implemented
 
  * date last modified not yet implemented
 
- * sha256sum for archive integrity not yet implemeted
-
  * xattrs not yet implemented (no idea what they even are)
 
 ### CLI:
