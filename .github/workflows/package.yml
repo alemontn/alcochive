@@ -1,0 +1,33 @@
+name: Package
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: clone repo
+        run: git clone https://github.com/alemontn/alcochive.git ~/alcochive
+
+      - name: make debian package
+        run: |
+          cd ~/alcochive
+          ./scripts/package.sh deb
+
+      - name: make bundle
+        run: |
+          cd ~/alcochive
+          rm -rf build
+          ./scripts/package.sh bundle
+
+      - name: move outputs
+        run: mv ~/alcochive/build/out ~/out
+
+      - name: upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: out
+          path: ~/out
