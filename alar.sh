@@ -149,8 +149,6 @@ function extract()
       fileDigest "$(cat "$tmpAr" | head -n1)"
       _removeLine 1
 
-      echo "length=$length" >&2
-
       if [ -n "$dirName" ]
       then
         mkdir -p "$dirName"

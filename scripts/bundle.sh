@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-shLength=129
+shLength=135
 
 # this file is meant to be used when creating
 # the bundle for alcochive.
@@ -23,6 +23,12 @@ function extract()
   {
     rmLength=$1
     cat "$tmpAr" | tail -n+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+  }
+
+  function _removeChar()
+  {
+    rmLength=$1
+    cat "$tmpAr" | tail -c+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
   }
 
   function _headerDigest()
@@ -81,7 +87,7 @@ function extract()
       then
         mkdir -p "$fileName"
       else
-        cat "$tmpAr" | head -n$length | head -c-1 >"$fileName"
+        cat "$tmpAr" | head -c$length >"$fileName"
       fi
 
       if [ ! "$filePerms" == 0000 ]
@@ -94,7 +100,7 @@ function extract()
         chown -R "$fileOwner" "$fileName"
       fi
 
-      _removeLine $length
+      _removeChar $length
     done
   }
 
