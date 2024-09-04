@@ -14,17 +14,17 @@ jobs:
 
       - name: make debian package
         run: |
+          mkdir ~/out
           cd ~/alcochive
           ./scripts/package.sh deb
+          mv build/out/*.deb ~/out/alcochive.deb
 
       - name: make bundle
         run: |
           cd ~/alcochive
           rm -rf build
           ./scripts/package.sh bundle
-
-      - name: move outputs
-        run: mv ~/alcochive/build/out ~/out
+          mv build/out/alcochive.bundle ~/out
 
       - name: upload packages
         uses: actions/upload-artifact@v4
