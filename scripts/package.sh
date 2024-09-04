@@ -21,7 +21,7 @@ function structures()
   if [ -d build ]
   then
     echo "removing build directory"
-    rm -rfv build
+    sudo rm -rfv build
   fi
 
   buildDir="$PWD"/build
@@ -36,6 +36,13 @@ function structures()
   mkdir -p usr/bin
 
   install -m755 "$buildDir"/source/alar.sh usr/bin/alar
+
+  echo "changing permissions"
+
+  # when using gh runner, owner will be 'runner:docker'
+  # which doesn't exist, so can't be set by `chown`
+  # when extracting
+  sudo chown -R root:root .
 
   cd "$buildDir"
 }
