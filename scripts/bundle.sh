@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-shLength=115
+shLength=129
 
 # this file is meant to be used when creating
 # the bundle for alcochive.
@@ -35,6 +35,11 @@ function extract()
     fi
     # remove starting indentifier
     header="${header#alar}"
+  
+    # last 64 chars (sha256sum)
+    catSum="${header: -64}"
+    # remove checksum
+    header="${header::-64}"
   
     fileLengths=(${header//,/ })
   }
@@ -100,6 +105,15 @@ function extract()
   _headerDigest
   # remove header
   _removeLine 1
+
+  arSum="$(cat "$tmpAr" | sha256sum)"
+  arSum="${arSum::64}"
+
+  if [ ! "$arSum" == "$catSum" ]
+  then
+    fatal "corrupted archive" "checksum (sha256) mismatch"
+  fi
+
   # extract files
   _fileSort
 
