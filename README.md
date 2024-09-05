@@ -44,7 +44,7 @@ by these speed tests
 the folder is `SF` and contains 65 different files, all
 amounting to 793 mib of data
 
-creating:
+### creating:
 
 ```
 $ time alar -c . > ../sf.alar
@@ -66,7 +66,7 @@ user	0m0.144s
 sys	0m1.840s
 ```
 
-extracting:
+### extracting:
 
 ```
 $ time alar -x < ../sf.alar
