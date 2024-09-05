@@ -19,6 +19,9 @@ jobs:
           ./scripts/package.sh deb
           mv build/out/*.deb ~/out/alcochive.deb
 
+      - name: install alcochive
+        run: sudo dpkg -i ~/out/alcochive.deb
+
       - name: make bundle
         run: |
           cd ~/alcochive
