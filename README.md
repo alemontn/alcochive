@@ -1,5 +1,7 @@
 # alcochive
 
+![package](https://github.com/alemontn/alcochive/actions/workflows/package.yml/badge.svg)
+
 ## what?
 
 this is an archive tool, written in shell script
