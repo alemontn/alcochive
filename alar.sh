@@ -34,11 +34,6 @@ function fatal()
   exit 1
 }
 
-function warn()
-{
-  echo $red"warning:"$none "$(errorContent "$@")" >&2
-}
-
 function usage()
 {
   echo "\
@@ -68,7 +63,7 @@ function version()
 
 function headerDigest()
 {
-  header="$(cat "$tmpAr" | head -n1)"
+  header="$(head -n1 "$tmpAr")"
 
   if [ ! "${header::4}" == "alar" ]
   then
@@ -91,7 +86,7 @@ function fileDigest()
 
   filePerms="${fileInfo::4}"
   fileOwner="${fileInfo:4}"
-    fileOwner="${fileOwner%)*}"
+    fileOwner="${fileOwner%%)*}"
     fileOwner="${fileOwner#(}"
   fileName="${fileInfo#$filePerms($fileOwner)}"
 
@@ -103,51 +98,46 @@ function fileDigest()
   fi
 }
 
+function removeLine()
+{
+  rmLength=$1
+  cat "$tmpAr" | tail -n+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+}
+
+function removeChar()
+{
+  rmLength=$1
+  cat "$tmpAr" | tail -c+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+}
+
 function read()
 {
-  tmpAr=/dev/stdin headerDigest
+  tmpAr="$(mktemp /tmp/alcochive-read-XXXXXXX)"
+  cat >"$tmpAr"
 
-  declare -i maxLength=1
+  headerDigest
+  removeLine 1
 
-  for fileLength in "${fileLengths[@]}"
+  for length in ${fileLengths[@]}
   do
-    declare -i useLength=$maxLength
+    fileDigest "$(cat "$tmpAr" | head -n1)"
+    removeLine 1
+    removeChar $length
 
-    if [ $maxLength -eq 1 ]
-    then
-      useLength+=1
-    fi
-
-    fileDigest "$(head -n+$useLength | tail -n1)"
     echo "$fileName"
-    maxLength+=$fileLength
   done
+
+  rm -f "$tmpAr"
 }
 
 function extract()
 {
-  function _removeLine()
-  {
-    rmLength=$1
-    cat "$tmpAr" | tail -n+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
-  }
-
-  function _removeChar()
-  {
-    rmLength=$1
-    cat "$tmpAr" | tail -c+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
-  }
-
   function _fileSort()
   {
-    declare -i fileCount=0
-
     for length in ${fileLengths[@]}
     do
-      fileCount+=1
-
       fileDigest "$(cat "$tmpAr" | head -n1)"
-      _removeLine 1
+      removeLine 1
 
       if [ -n "$dirName" ]
       then
@@ -174,8 +164,7 @@ function extract()
         chown -R "$fileOwner" "$fileName"
       fi
 
-      _removeChar $length
-      #_removeLine 1
+      removeChar $length
     done
   }
 
@@ -191,7 +180,7 @@ function extract()
   headerDigest
 
   # long way of removing header but oh well
-  _removeLine 1
+  removeLine 1
 
   arSum="$(cat "$tmpAr" | sha256sum)"
   arSum="${arSum::64}"
@@ -203,7 +192,7 @@ function extract()
 
   _fileSort
 
-  #rm -f "$tmpAr"
+  rm -f "$tmpAr"
 }
 
 function create()
@@ -217,11 +206,6 @@ function create()
     if [ $fileLength -eq 0 ]
     then
       fatal "$fileName" "cannot add empty files to archive"
-    fi
-
-    if ! file - <"$fileName" | grep -qF "text"
-    then
-      warn "$fileName" "binary files are not fully supported - expect file corruption"
     fi
 
     header+=$fileLength,
