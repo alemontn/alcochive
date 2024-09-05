@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-shLength=135
+shLength=147
 
 # this file is meant to be used when creating
 # the bundle for alcochive.
@@ -35,13 +35,19 @@ function extract()
   {
     header="$(cat "$tmpAr" | head -n1)"
   
-    if [ ! "${header::4}" == "alar" ]
+    if [ ! "${header::4}" == "alzr" ]
     then
-      fatal "corrupted archive" "header is invalid"
+      fatal "corrupted archive": "header is invalid"
     fi
     # remove starting indentifier
-    header="${header#alar}"
-  
+    header="${header#alzr}"
+
+    if [ ! "${header::2}" == "zs" ]
+    then
+      fatal "unknown compressor" "only 'zs' (zstd) is supported"
+    fi
+    header="${header#zs}"
+
     # last 64 chars (sha256sum)
     catSum="${header: -64}"
     # remove checksum
@@ -87,7 +93,7 @@ function extract()
       then
         mkdir -p "$fileName"
       else
-        cat "$tmpAr" | head -c$length >"$fileName"
+        cat "$tmpAr" | head -c$length | unzstd >"$fileName"
       fi
 
       if [ ! "$filePerms" == 0000 ]
@@ -106,7 +112,7 @@ function extract()
 
   tmpAr="$(mktemp /tmp/alcochive-extract-XXXXXXX)"
 
-  tail -n+$shLength "$0" | gunzip >"$tmpAr"
+  tail -n+$shLength "$0" >"$tmpAr"
 
   _headerDigest
   # remove header
@@ -130,5 +136,11 @@ if [ ! -w / ]
 then
   fatal "write permission to root denied"
 fi
+
+if ! command -v zstd > /dev/null
+then
+  fatal "zstd must be installed for decompression"
+fi
+
 extract
 exit

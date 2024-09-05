@@ -34,8 +34,14 @@ function structures()
 
   cd ar
   mkdir -p usr/bin
+  mkdir -p usr/lib/alcochive/compress.d
 
   install -m755 "$buildDir"/source/alar.sh usr/bin/alar
+
+  for compress in "$buildDir"/source/compress.d/*
+  do
+    install -m755 "$compress" usr/lib/alcochive/compress.d/
+  done
 
   echo "changing permissions"
 
@@ -73,9 +79,8 @@ function makeBundle()
 
   cat "$buildDir"/source/scripts/bundle.sh >"$buildDir"/out/alcochive.bundle
 
-  # stupidly long command for creating archive
-  "$buildDir"/source/alar.sh -c $(find -type f -print0 | xargs -0 ls -1 | sed "s|^./||") |
-    gzip -1 >>"$buildDir"/out/alcochive.bundle
+  # create a compressed archive
+  "$buildDir"/source/alar.sh -z zstd -c . -v >>"$buildDir"/out/alcochive.bundle 2>"$buildDir"/alar.log
 
   chmod +x "$buildDir"/out/alcochive.bundle
 }

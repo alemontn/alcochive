@@ -66,6 +66,9 @@ user	0m0.144s
 sys	0m1.840s
 ```
 
+alcochive is ~2x slower than `tar` and ~1.1x slower
+than `cpio` at creating
+
 ### extracting:
 
 ```
@@ -87,6 +90,9 @@ real	0m5.149s
 user	0m0.186s
 sys	0m2.061s
 ```
+
+alcochive is ~12x slower than `tar` and ~6x slower
+than `cpio` at extracting
 
 ## installation
 

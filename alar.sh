@@ -50,6 +50,7 @@ ${bold}Operations:${none}
 
 ${bold}Arguments:${none}
  -v, --verbose    show more information
+ -z, --compress   compress archival content
  -C, --dir        specify directory to extract to
      --overwrite  let existing files be overwritten
      --no-owner   don't include or change file ownership
@@ -69,12 +70,29 @@ function headerDigest()
 {
   header="$(head -n1 "$tmpAr")"
 
-  if [ ! "${header::4}" == "alar" ]
-  then
-    fatal "corrupted archive" "header is invalid"
-  fi
-  # remove starting indentifier
-  header="${header#alar}"
+  case "${header::4}" in
+    "alar")
+      header="${header#alar}"
+      ;;
+    "alzr")
+      header="${header#alzr}"
+
+      for compressTemplate in /lib/alcochive/compress.d/*
+      do
+        eval "$(<"$compressTemplate")"
+
+        if [ "$zHeader" == "${header::2}" ]
+        then
+          # matched compressor
+          header="${header:2}"
+          break
+        fi
+      done
+      ;;
+    *)
+      fatal "corrupted archive" "header is invalid"
+      ;;
+  esac
 
   # last 64 chars (sha256sum)
   catSum="${header: -64}"
@@ -97,8 +115,10 @@ function fileDigest()
   if [[ "$fileName" == */* ]]
   then
     dirName="${fileName%/*}"
+    fileBase="$(basename "$fileName")"
   else
     unset dirName
+    fileBase="$fileName"
   fi
 }
 
@@ -160,7 +180,12 @@ function extract()
       then
         fatal "$fileName" "cannot write to existing file (use '--overwrite')"
       else
-        cat "$tmpAr" | head -c$length >"$fileName"
+        if [ -n "$decompress" ]
+        then
+          cat "$tmpAr" | head -c$length | eval "$decompress" >"$fileName"
+        else
+          cat "$tmpAr" | head -c$length >"$fileName"
+        fi
       fi
 
       if [ ! "$filePerms" == 0000 ] && [ ! "$setPerms" == false ]
@@ -214,12 +239,36 @@ function extract()
 
 function create()
 {
+  headerId="alar"
+
+  if [ -n "$compressor" ]
+  then
+    headerId="alzr"
+
+    if [ ! -f /lib/alcochive/compress.d/"$compressor" ]
+    then
+      fatal "$compressor" "unknown compressor"
+    fi
+
+    eval "$(</lib/alcochive/compress.d/"$compressor")"
+
+    headerId+="$zHeader"
+  fi
+
   tmpAr="$(mktemp /tmp/alcochive-create-XXXXXXX)"
 
-  if [ "${targets[@]}" == "." ]
+  if [ ${#targets[@]} -le 1 ] && [ "${targets[@]}" == "." ]
   then
     targets=(**/*)
   fi
+
+  function _zAddFile()
+  {
+    tmpFile="$(mktemp /tmp/alcochive-file-"$fileBase"-XXXXXXX)"
+    cat "$fileName" | eval "$compress" >"$tmpFile"
+    fileLength=$(cat "$tmpFile" | wc -c)
+    header+=$fileLength,
+  }
 
   function _addFile()
   {
@@ -241,6 +290,7 @@ function create()
 
   for fileName in "${targets[@]}"
   do
+    fileBase="$(basename "$fileName")"
     filePerms=$(stat -c '%a' "$fileName")
     fileOwner="$(stat -c '%U:%G' "$fileName")"
 
@@ -249,7 +299,10 @@ function create()
       continue #_addDir
     elif [ -f "$fileName" ]
     then
-      _addFile
+      case "$headerId" in
+        "alar") _addFile;;
+        "alzr"*) _zAddFile;;
+      esac
     else
       fatal "$fileName" "no such file or directory"
     fi
@@ -272,12 +325,20 @@ function create()
     fileName="${fileAdd:4}"
       fileName="${fileName#(*)}"
 
+    fileBase="$(basename "$fileName")"
+
     echo "$fileAdd" >>"$tmpAr"
 
     if [ ! "${fileAdd: -1}" == / ]
     then
       # a file
-      cat "$fileName" >>"$tmpAr"
+      if [ -n "$compress" ]
+      then
+        cat /tmp/alcochive-file-"$fileBase"-* >>"$tmpAr"
+        rm -f /tmp/alcochive-file-"$fileBase"-*
+      else
+        cat "$fileName" >>"$tmpAr"
+      fi
     fi
   done
 
@@ -286,7 +347,7 @@ function create()
 
   header="${header%,}"
 
-  echo alar"$header$sum"
+  echo "$headerId$header$sum"
   cat "$tmpAr"
   rm -f "$tmpAr"
 }
@@ -311,15 +372,22 @@ function main()
       "--list"|"-t")
         operation="read"
         ;;
-      "--dir="*)
-        directory="${arg#--dir=}"
-        ;;
       "--verbose"|"-v")
         verbose=true
+        ;;
+      "--dir="*)
+        directory="${1#--dir=}"
         ;;
       "-C"*)
         shift
         directory="$1"
+        ;;
+      "--compress="*)
+        compressor="${1##--compress=}"
+        ;;
+      "-z")
+        shift
+        compressor="$1"
         ;;
       "--overwrite")
         overwrite=true

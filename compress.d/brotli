@@ -1,0 +1,6 @@
+compress="brotli -c"
+decompress="brotli -dc"
+fastestLevel=0
+bestLevel=9
+setLevel=-
+zHeader=br

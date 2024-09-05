@@ -1,0 +1,6 @@
+compress="zstd -c"
+decompress="unzstd -c"
+fastestLevel=1
+bestLevel=19
+setLevel=-
+zHeader=zs

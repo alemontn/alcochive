@@ -1,0 +1,6 @@
+compress="lz4 -c"
+decompress="unlz4 -c"
+fastestLevel=1
+bestLevel=12
+setLevel=-
+zHeader=l4

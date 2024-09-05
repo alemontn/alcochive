@@ -1,0 +1,6 @@
+compress="gzip -c"
+decompress="gunzip -c"
+fastestLevel=1
+bestLevel=9
+setLevel=-
+zHeader=gz

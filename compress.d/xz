@@ -1,0 +1,6 @@
+compress="xz -c"
+decompress="unxz -c"
+fastestLevel=0
+bestLevel=9
+setLevel=-
+zHeader=xz
