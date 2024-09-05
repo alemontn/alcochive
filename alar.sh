@@ -47,10 +47,12 @@ ${bold}Operations:${none}
  -t, --list       list contents of archive
 
 ${bold}Arguments:${none}
+ -v, --verbose    show more information
  -C, --dir        specify directory to extract to
      --overwrite  let existing files be overwritten
-     --no-owner   don't change owner when extracting
-     --no-perms   don't change permissions when extracting
+     --no-owner   don't include or change file ownership
+     --no-perms   don't include or change file permissions
+     --skip-sum   skip archive integrity check (checksum) when extracting
 "
   exit 0
 }
@@ -124,7 +126,12 @@ function read()
     removeLine 1
     removeChar $length
 
-    echo "$fileName"
+    if [ "$verbose" == true ]
+    then
+      echo "$fileName $fileOwner $filePerms $(echo $length | numfmt --to=si)"
+    else
+      echo "$fileName"
+    fi
   done
 
   rm -f "$tmpAr"
@@ -164,6 +171,11 @@ function extract()
         chown -R "$fileOwner" "$fileName"
       fi
 
+      if [ "$verbose" == true ]
+      then
+        echo "$fileName"
+      fi
+
       removeChar $length
     done
   }
@@ -182,12 +194,15 @@ function extract()
   # long way of removing header but oh well
   removeLine 1
 
-  arSum="$(cat "$tmpAr" | sha256sum)"
-  arSum="${arSum::64}"
-
-  if [ ! "$arSum" == "$catSum" ]
+  if [ ! "$skipSum" == true ]
   then
-    fatal "corrupted archive" "checksum (sha256) mismatch"
+    arSum="$(cat "$tmpAr" | sha256sum)"
+    arSum="${arSum::64}"
+
+    if [ ! "$arSum" == "$catSum" ]
+    then
+      fatal "corrupted archive" "checksum (sha256) mismatch"
+    fi
   fi
 
   _fileSort
@@ -292,6 +307,9 @@ function main()
       "--dir="*)
         directory="${arg#--dir=}"
         ;;
+      "--verbose"|"-v")
+        verbose=true
+        ;;
       "-C"*)
         shift
         directory="$1"
@@ -304,6 +322,9 @@ function main()
         ;;
       "--no-owner")
         setOwner=false
+        ;;
+      "--skip-sum")
+        skipSum=true
         ;;
       *)
         targets+=("$1")
