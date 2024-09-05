@@ -2,6 +2,8 @@
 
 # exit on errors
 set -o "errexit"
+# extended globbing
+shopt -s "globstar"
 
 # colours & formatting :o
 red=$(echo -ne '\e[1;31m')
@@ -213,6 +215,11 @@ function extract()
 function create()
 {
   tmpAr="$(mktemp /tmp/alcochive-create-XXXXXXX)"
+
+  if [ "${targets[@]}" == "." ]
+  then
+    targets=(**/*)
+  fi
 
   function _addFile()
   {
