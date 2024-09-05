@@ -26,6 +26,16 @@ jobs:
           ./scripts/package.sh bundle
           mv build/out/alcochive.bundle ~/out
 
+      - name: upload logs
+        if: $(( always() && contains(needs.*.result, 'failure') ))
+        run: |
+          cd ~/alcochive/build
+          for logFile in *.log
+          do
+            echo ":: $logFile:"
+            cat "$logFile" >&2
+          done
+
       - name: upload packages
         uses: actions/upload-artifact@v4
         with:
