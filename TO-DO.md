@@ -18,8 +18,8 @@ fixed/implemented
 
 ### CLI:
 
- * reading (`-t`) only displays filenames, no other info
-   (permissions, owner, etc..)
+ * creating a compressed archive means making lots of temporary
+   files which is very messy, need a smoother way of doing this
 
  * arguments have to be seperated (e.g. `-x -C /`) when ideally
    should be able to be put together (e.g. `-xC /`)

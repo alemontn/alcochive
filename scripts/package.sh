@@ -13,17 +13,23 @@ function fatal()
 
 function structures()
 {
+  # git repos will always have the '.git' directory
   if [ ! -d .git ]
   then
     fatal "this command must be ran in the root of the git repo"
   fi
 
+  # the script has already been ran once before
   if [ -d build ]
   then
     echo "removing build directory"
+    # removing as root because some of the permissions
+    # are changed to root for when it is extracted to
+    # the root directory
     sudo rm -rfv build
   fi
 
+  # capture current directory
   buildDir="$PWD"/build
   echo "build directory is $buildDir"
 
@@ -60,7 +66,9 @@ function makeDebianPkg()
 
   mkdir -pm755 deb/build/DEBIAN
 
+  # debian control file
   cp "$buildDir"/source/alcochive.control deb/build/DEBIAN/control
+  # copy everything that is neede for packaging
   cp -a "$buildDir"/ar/* deb/build
 
   cd deb/build
@@ -78,6 +86,10 @@ function makeBundle()
   cd "$buildDir"/ar
 
   # create a compressed archive
+  # the bundle only supports ZSTD compressed archives
+  # so don't try to change this to anything else like
+  # gzip or xz
+
   "$buildDir"/source/alar.sh -z zstd -c . -v \
     >"$buildDir"/out/alcochive.alzr \
     2>"$buildDir"/alar.log

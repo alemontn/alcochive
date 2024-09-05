@@ -108,11 +108,11 @@ bundles
 to make - for example - a deb package:
 
 ```
-$ ./package.sh deb
+$ ./scripts/package.sh deb
 ```
 
 or a bundle:
 
 ```
-$ ./package.sh bundle
+$ ./scripts/package.sh bundle
 ```
