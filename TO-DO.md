@@ -26,4 +26,4 @@ fixed/implemented
 
 ### MORE:
 
- * need to implement other packaging formats (rpm, pacman)
+ * add arch linux package
