@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# what version are we packaging for?
+version=0.0.2
+
 set -o "errexit"
 
 function fatal()
@@ -75,7 +78,30 @@ function makeDebianPkg()
   dpkg-deb --root-owner-group --build "$PWD" &> "$buildDir"/deb.log
 
   cd ..
-  mv *.deb "$buildDir"/out
+  mv *.deb "$buildDir"/out/
+}
+
+function makeFedoraPkg()
+{
+  echo "building fedora package"
+  structures
+
+  mkdir -pm755 rpm/rpmbuild
+  mkdir rpm/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+  cp "$buildDir"/source/alcochive.spec rpm/rpmbuild/SPECS/
+
+  cd "$buildDir"/rpm
+
+  mkdir alcochive-$version
+  cp -a "$buildDir"/ar/* alcochive-$version
+
+  tar -H "ustar" -c alcochive-$version |
+    gzip -1 >rpmbuild/SOURCES/alcochive-$version.tgz
+
+  cd rpmbuild
+  HOME="$buildDir"/rpm rpmbuild -bb SPECS/* &>"$buildDir"/rpm.log
+  mv ./RPMS/noarch/*.rpm "$buildDir"/out/
 }
 
 function makeBundle()

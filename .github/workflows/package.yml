@@ -14,13 +14,22 @@ jobs:
 
       - name: make debian package
         run: |
-          mkdir ~/out
+          mkdir ~/out ~/log
           cd ~/alcochive
           ./scripts/package.sh deb
           mv build/out/*.deb ~/out/alcochive.deb
+          cp build/*.log ~/log
 
       - name: install alcochive
         run: sudo dpkg -i ~/out/alcochive.deb
+
+      - name: make fedora package
+        run: |
+          cd ~/alcochive
+          sudo rm -rf build
+          ./scripts/package.sh rpm
+          mv build/out/*.rpm ~/out
+          cp build/*.log ~/log
 
       - name: make bundle
         run: |
@@ -29,12 +38,13 @@ jobs:
           ./scripts/package.sh bundle
           mv build/out/alcochive.bundle ~/out
           mv build/out/alcochive.alzr ~/out
+          cp build/*.log ~/log
 
       - name: upload logs
         if: always()
         run: |
           cd ~/alcochive/build
-          for logFile in *.log
+          for logFile in *.log ~/log/*
           do
             echo ":: $logFile:"
             cat "$logFile" >&2
