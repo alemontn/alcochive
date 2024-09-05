@@ -22,14 +22,6 @@ function errorContent()
 
 function fatal()
 {
-  errorContent="$(
-    for s in "$@"
-    do
-      echo -n "$s: "
-    done
-  )"
-    errorContent="${errorContent%: }"
-
   rm -f "$tmpAr"
 
   echo $red"error (fatal):"$none "$(errorContent "$@")" >&2
@@ -62,7 +54,7 @@ ${bold}Arguments:${none}
 
 function version()
 {
-  echo $bold"alcochive"$none "version" 0.0.1 >&2
+  echo $bold"alcochive"$none "version" 0.0.2 >&2
   exit 0
 }
 

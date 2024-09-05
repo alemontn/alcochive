@@ -77,10 +77,15 @@ function makeBundle()
 
   cd "$buildDir"/ar
 
-  cat "$buildDir"/source/scripts/bundle.sh >"$buildDir"/out/alcochive.bundle
-
   # create a compressed archive
-  "$buildDir"/source/alar.sh -z zstd -c . -v >>"$buildDir"/out/alcochive.bundle 2>"$buildDir"/alar.log
+  "$buildDir"/source/alar.sh -z zstd -c . -v \
+    >"$buildDir"/out/alcochive.alzr \
+    2>"$buildDir"/alar.log
+
+  # join bundle & archive
+  cat "$buildDir"/source/scripts/bundle.sh \
+      "$buildDir"/out/alcochive.alzr \
+        >"$buildDir"/out/alcochive.bundle
 
   chmod +x "$buildDir"/out/alcochive.bundle
 }
