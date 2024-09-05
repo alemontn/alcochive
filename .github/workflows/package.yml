@@ -27,7 +27,7 @@ jobs:
           mv build/out/alcochive.bundle ~/out
 
       - name: upload logs
-        if: $(( always() && contains(needs.*.result, 'failure') ))
+        if: always()
         run: |
           cd ~/alcochive/build
           for logFile in *.log
