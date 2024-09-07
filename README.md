@@ -32,6 +32,12 @@ to extract an archive use `-x`:
 $ alar -x < files.alar
 ```
 
+to extract a file to `stdout` use `-O`:
+
+```
+$ alar -O -x file1 < files.alar
+```
+
 you can also use `-C` to specify the output directory:
 
 ```
@@ -95,6 +101,41 @@ sys	0m2.061s
 
 alcochive is ~12x slower than `tar` and ~6x slower
 than `cpio` at extracting
+
+## formats
+
+alcochive has two formats:
+
+* alar (uncompressed) and
+
+* alzr (compressed)
+
+by default, `zstd`, `gzip`, `lz4`, `xz` & `brotli`
+are supported but this can be extended by creating
+a compression template in `/lib/alcochive/compress.d`
+
+example:
+
+```
+compress="gzip -c"     # the command used to compress & output to stdout
+decompress="gunzip -c" # same but with decompression
+fastestLevel=1         # the compression level that is fastest
+bestLevel=9            # the max compression level, slower but file will be smallest
+setLevel=-             # the argument used to set the compression level (e.g. -9)
+zHeader=gz             # the header used to identify the compression algorithm when extracting/reading
+```
+
+to create a compressed archive:
+
+```
+$ alar -z <ALGORITHM> -c file0 file1 file2 ... > files.alzr
+```
+
+these archives extract the same way:
+
+```
+$ alar -x < files.alzr
+```
 
 ## installation
 

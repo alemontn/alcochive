@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-shLength=147
+shLength=149
 
 # this file is meant to be used when creating
 # the bundle for alcochive.
@@ -93,7 +93,7 @@ function extract()
       then
         mkdir -p "$fileName"
       else
-        cat "$tmpAr" | head -c$length | unzstd >"$fileName"
+        cat "$tmpAr" | head -c$length >"$fileName"
       fi
 
       if [ ! "$filePerms" == 0000 ]
@@ -125,6 +125,8 @@ function extract()
   then
     fatal "corrupted archive" "checksum (sha256) mismatch"
   fi
+
+  unzstd <"$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
 
   # extract files
   _fileSort

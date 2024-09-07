@@ -30,6 +30,14 @@ function fatal()
 
 function usage()
 {
+  compressors="$(
+    for compressor in /lib/alcochive/compress.d/*
+    do
+      echo -n "${compressor##*/}|"
+    done
+  )"
+  compressors="${compressors%|}"
+
   echo "\
 Usage: ${0##*/} <OPERATION> [ARGUMENTs] [TARGETs]
 
@@ -42,7 +50,8 @@ ${bold}Operations:${none}
 
 ${bold}Arguments:${none}
  -v, --verbose    show more information
- -z, --compress   compress archival content
+ -z, --compress   compress archival content ($compressors)
+ -O, --stdout     output a single file's contents to stdout
  -C, --dir        specify directory to extract to
      --overwrite  let existing files be overwritten
      --no-owner   don't include or change file ownership
@@ -134,6 +143,11 @@ function read()
   headerDigest
   removeLine 1
 
+  if [ -n "$decompress" ]
+  then
+    eval "$decompress" <"$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
+  fi
+
   for length in ${fileLengths[@]}
   do
     fileDigest "$(cat "$tmpAr" | head -n1)"
@@ -153,33 +167,25 @@ function read()
 
 function extract()
 {
-  function _fileSort()
+  function _extract()
   {
-    for length in ${fileLengths[@]}
-    do
-      fileDigest "$(cat "$tmpAr" | head -n1)"
-      removeLine 1
+    if [ -n "$dirName" ]
+    then
+      mkdir -p "$dirName"
+    fi
 
-      if [ -n "$dirName" ]
-      then
-        mkdir -p "$dirName"
-      fi
+    if [ "${fileName: -1}" == / ]
+    then
+      mkdir -p "$fileName"
+    elif [ ! "$overwrite" == true ] && [ -f "$fileName" ]
+    then
+      fatal "$fileName" "cannot write to existing file (use '--overwrite')"
+    else
+      cat "$tmpAr" | head -c$length >"$fileName"
+    fi
 
-      if [ "${fileName: -1}" == / ]
-      then
-        mkdir -p "$fileName"
-      elif [ ! "$overwrite" == "true" ] && [ -f "$fileName" ]
-      then
-        fatal "$fileName" "cannot write to existing file (use '--overwrite')"
-      else
-        if [ -n "$decompress" ]
-        then
-          cat "$tmpAr" | head -c$length | eval "$decompress" >"$fileName"
-        else
-          cat "$tmpAr" | head -c$length >"$fileName"
-        fi
-      fi
-
+    if [ ! "$fileName" == /dev/stdout ]
+    then
       if [ ! "$filePerms" == 0000 ] && [ ! "$setPerms" == false ]
       then
         chmod -R "$filePerms" "$fileName"
@@ -193,6 +199,53 @@ function extract()
       if [ "$verbose" == true ]
       then
         echo "$fileName"
+      fi
+    fi
+  }
+
+  function _matchTarget()
+  {
+    ret=1
+    for target in "${targets[@]}"
+    do
+      if [ "$target" == "$fileName" ]
+      then
+        ret=0
+      fi
+    done
+    return $ret
+  }
+
+  function _fileSort()
+  {
+    for length in ${fileLengths[@]}
+    do
+      fileDigest "$(cat "$tmpAr" | head -n1)"
+      removeLine 1
+
+      if [ "$stdout" == true ]
+      then
+        if [ "${targets[@]}" == "$fileName" ]
+        then
+          fileName=/dev/stdout _fileExtract
+          exit 0
+        else
+          removeChar $length
+          continue
+        fi
+      fi
+
+      if [ ${#targets[@]} -eq 0 ]
+      then
+        _extract
+      else
+        if _matchTarget
+        then
+          _extract
+        else
+          removeChar $length
+          continue
+        fi
       fi
 
       removeChar $length
@@ -222,6 +275,11 @@ function extract()
     then
       fatal "corrupted archive" "checksum (sha256) mismatch"
     fi
+  fi
+
+  if [ -n "$decompress" ]
+  then
+    eval "$decompress" <"$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
   fi
 
   _fileSort
@@ -254,17 +312,9 @@ function create()
     targets=(**/*)
   fi
 
-  function _zAddFile()
-  {
-    tmpFile="$(mktemp /tmp/alcochive-file-"$fileBase"-XXXXXXX)"
-    cat "$fileName" | eval "$compress" >"$tmpFile"
-    fileLength=$(cat "$tmpFile" | wc -c)
-    header+=$fileLength,
-  }
-
   function _addFile()
   {
-    fileLength=$(cat "$fileName" | wc -c)
+    fileLength=$(cat "$filePath" | wc -c)
 
     if [ $fileLength -eq 0 ]
     then
@@ -280,23 +330,30 @@ function create()
     fileName+=/
   }
 
-  for fileName in "${targets[@]}"
+  for filePath in "${targets[@]}"
   do
-    fileBase="$(basename "$fileName")"
-    filePerms=$(stat -c '%a' "$fileName")
-    fileOwner="$(stat -c '%U:%G' "$fileName")"
+    fileName="$filePath"
 
-    if [ -d "$fileName" ]
+    # remove leading slashes from name
+    until [ ! "${fileName::1}" == / ]
+    do
+      fileName="${fileName#/}"
+    done
+
+    fileName="${fileName#./}"
+
+    fileBase="$(basename "$fileName")"
+    filePerms=$(stat -c '%a' "$filePath")
+    fileOwner="$(stat -c '%U:%G' "$filePath")"
+
+    if [ -d "$filePath" ]
     then
       continue #_addDir
-    elif [ -f "$fileName" ]
+    elif [ -f "$filePath" ]
     then
-      case "$headerId" in
-        "alar") _addFile;;
-        "alzr"*) _zAddFile;;
-      esac
+      _addFile
     else
-      fatal "$fileName" "no such file or directory"
+      fatal "$filePath" "no such file or directory"
     fi
 
     if [ ${#filePerms} -eq 3 ]
@@ -305,6 +362,7 @@ function create()
     fi
 
     body+=("$filePerms($fileOwner)$fileName")
+    paths+=("$filePath")
   done
 
   if [ -z "$body" ]
@@ -312,8 +370,11 @@ function create()
     fatal "cowardly refusing to create an empty archive"
   fi
 
+  declare -i fileLoop=0
+
   for fileAdd in "${body[@]}"
   do
+    filePath="${paths[$fileLoop]}"
     fileName="${fileAdd:4}"
       fileName="${fileName#(*)}"
 
@@ -324,15 +385,21 @@ function create()
     if [ ! "${fileAdd: -1}" == / ]
     then
       # a file
-      if [ -n "$compress" ]
-      then
-        cat /tmp/alcochive-file-"$fileBase"-* >>"$tmpAr"
-        rm -f /tmp/alcochive-file-"$fileBase"-*
-      else
-        cat "$fileName" >>"$tmpAr"
-      fi
+      cat "$filePath" >>"$tmpAr"
     fi
+
+    if [ "$verbose" == true ]
+    then
+      echo "$fileName" >&2
+    fi
+
+    fileLoop+=1
   done
+
+  if [ -n "$compressor" ]
+  then
+    eval "$compressor" <"$tmpAr" >"$tmpAr".z && mv "$tmpAr".z "$tmpAr"
+  fi
 
   sum="$(cat "$tmpAr" | sha256sum)"
   sum="${sum::64}"
@@ -341,6 +408,7 @@ function create()
 
   echo "$headerId$header$sum"
   cat "$tmpAr"
+
   rm -f "$tmpAr"
 }
 
@@ -381,6 +449,9 @@ function main()
         shift
         compressor="$1"
         ;;
+      "--stdout"|"-O")
+        stdout=true
+        ;;
       "--overwrite")
         overwrite=true
         ;;
@@ -401,16 +472,9 @@ function main()
     shift
   done
 
-  if [ ${#targets[@]} -ne 0 ]
+  if [ ${#targets[@]} -gt 1 ] && [ "$stdout" == true ]
   then
-    case "$operation" in
-      "usage"|"version")
-        fatal "invalid arguments" "target/s provided when none were needed"
-        ;;
-      "extract"|"read")
-        fatal "invalid arguments" "use stdin instead of filenames for extracting/listing"
-        ;;
-    esac
+    fatal "argument '--stdout' only takes one target"
   fi
 
   if [ -z "$operation" ]
