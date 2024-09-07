@@ -1,3 +1,4 @@
+compressName="xz"
 compress="xz -c"
 decompress="unxz -c"
 fastestLevel=0

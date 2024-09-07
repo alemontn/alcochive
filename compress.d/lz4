@@ -1,3 +1,4 @@
+compressName="lz4"
 compress="lz4 -c"
 decompress="unlz4 -c"
 fastestLevel=1

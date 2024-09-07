@@ -1,3 +1,4 @@
+compressName="brotli"
 compress="brotli -c"
 decompress="brotli -dc"
 fastestLevel=0

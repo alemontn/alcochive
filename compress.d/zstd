@@ -1,3 +1,4 @@
+compressName="ZStandard"
 compress="zstd -c"
 decompress="unzstd -c"
 fastestLevel=1

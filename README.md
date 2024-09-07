@@ -24,6 +24,18 @@ to list the contents of an archive use `-t`:
 
 ```
 $ alar -t < files.alar
+file0
+file1
+file2
+```
+
+to show info about an archive use `-q`:
+
+```
+$ alar -q < files.alar
+uncompressed archive
+total of 3 file(s)
+~558 extracted size
 ```
 
 to extract an archive use `-x`:

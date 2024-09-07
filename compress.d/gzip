@@ -1,3 +1,4 @@
+compressName="gzip"
 compress="gzip -c"
 decompress="gunzip -c"
 fastestLevel=1

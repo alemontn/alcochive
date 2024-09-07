@@ -13,7 +13,10 @@ bold=$(echo -ne '\e[1m')
 
 function cleanup()
 {
-  rm -f "$tmpAr"{,.tmp}
+  if [ "${tmpAr::5}" == /tmp/ ]
+  then
+    rm -f "$tmpAr"{,.tmp}
+  fi
 }
 
 trap "cleanup" EXIT
@@ -54,6 +57,7 @@ ${bold}Operations:${none}
  -V, --version    show alcochive version
  -x, --extract    extract file/s from archive
  -c, --create     create an archive from file/s
+ -q, --show       show information about an archive
  -t, --list       list contents of archive
 
 ${bold}Arguments:${none}
@@ -77,7 +81,8 @@ function version()
 
 function headerDigest()
 {
-  header="$(head -n1 "$tmpAr")"
+  header="$(head -n1 "$tmpAr" | cut -d'>' -f1)"
+  headerLength=${#header}
 
   case "${header::4}" in
     "alar")
@@ -93,7 +98,9 @@ function headerDigest()
         if [ "$zHeader" == "${header::2}" ]
         then
           # matched compressor
-          header="${header:3}"
+          header="${header:2}"
+          levelId="${header::1}"
+          header="${header:1}"
           break
         fi
       done
@@ -131,16 +138,44 @@ function fileDigest()
   fi
 }
 
-function removeLine()
-{
-  rmLength=$1
-  sed -i ${rmLength}d "$tmpAr"
-}
-
 function removeChar()
 {
   rmLength=$1
-  tail -c+$((rmLength+1)) "$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
+  tail -c+$(($1+1)) "$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
+}
+
+function show()
+{
+  tmpAr=/dev/stdin headerDigest
+  unset tmpAr
+
+  case "$levelId" in
+    D) levelDisplay="default";;
+    S) levelDisplay="custom";;
+    X) levelDIsplay="best";;
+    N) levelDisplay="fastest";;
+  esac
+
+  if [ -n "$compress" ]
+  then
+    echo "$compressName with $levelDisplay compression"
+  else
+    echo "uncompressed archive"
+  fi
+
+  echo "total of ${#fileLengths[@]} file(s)"
+
+  if [ -z "$compress" ]
+  then
+    fileAdd=$(
+      for length in "${fileLengths[@]}"
+      do
+        echo -n $length+
+      done
+    )
+    fileTotal="$(echo $((${fileAdd%+})) | numfmt --to=iec)"
+    echo "~$fileTotal extracted size"
+  fi
 }
 
 function read()
@@ -149,7 +184,7 @@ function read()
   cat >"$tmpAr"
 
   headerDigest
-  removeLine 1
+  removeChar $((headerLength+1))
 
   if [ -n "$decompress" ]
   then
@@ -170,7 +205,7 @@ function read()
 
     if [ "$verbose" == true ]
     then
-      echo "$fileName $fileOwner $filePerms $(echo $length | numfmt --to=si)"
+      echo "$fileName $fileOwner $filePerms $(echo $length | numfmt --to=iec)"
     else
       echo "$fileName"
     fi
@@ -236,7 +271,7 @@ function extract()
     for length in ${fileLengths[@]}
     do
       fileDigest "$(cat "$tmpAr" | head -n1)"
-      removeLine 1
+      sed -i 1d "$tmpAr"
 
       if [ "$stdout" == true ]
       then
@@ -277,9 +312,7 @@ function extract()
   cat >"$tmpAr"
 
   headerDigest
-
-  # long way of removing header but oh well
-  removeLine 1
+  removeChar $((headerLength+1))
 
   if [ ! "$skipSum" == true ]
   then
@@ -445,7 +478,7 @@ function create()
 
   header="${header%,}"
 
-  echo "$headerId$header$sum"
+  echo -n "$headerId$header$sum>"
   cat "$tmpAr"
 }
 
@@ -492,6 +525,7 @@ function main()
       "--version"|"-V") _setOperation "version";;
       "--extract"|"-x") _setOperation "extract";;
       "--create"|"-c")  _setOperation "create";;
+      "--show"|"-q")    _setOperation "show";;
       "--list"|"-t")    _setOperation "read";;
       "--verbose"|"-v") verbose=true;;
       "--stdout"|"-O")  stdout=true;;

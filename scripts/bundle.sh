@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-shLength=151
+shLength=160
 
 # this file is meant to be used when creating
 # the bundle for alcochive.
@@ -21,40 +21,50 @@ function extract()
 {
   function _removeLine()
   {
-    rmLength=$1
-    cat "$tmpAr" | tail -n+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+    cat "$tmpAr" | tail -n+$(($1+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
   }
 
   function _removeChar()
   {
-    rmLength=$1
-    cat "$tmpAr" | tail -c+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+    cat "$tmpAr" | tail -c+$(($1+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
   }
 
   function _headerDigest()
   {
-    header="$(cat "$tmpAr" | head -n1)"
-  
-    if [ ! "${header::4}" == "alzr" ]
-    then
-      fatal "corrupted archive": "header is invalid"
-    fi
-    # remove starting indentifier
-    header="${header#alzr}"
+    header="$(head -n1 "$tmpAr" | cut -d'>' -f1)"
+    headerLength=${#header}
 
-    if [ ! "${header::2}" == "zs" ]
-    then
-      fatal "unknown compressor" "only 'zs' (zstd) is supported"
-    fi
-    header="${header#zs}"
-    # remove compression level ID
-    header="${header:1}"
+    case "${header::4}" in
+      "alar")
+        header="${header#alar}"
+        ;;
+      "alzr")
+        header="${header#alzr}"
+
+        for compressTemplate in /lib/alcochive/compress.d/*
+        do
+          eval "$(<"$compressTemplate")"
+
+          if [ "$zHeader" == "${header::2}" ]
+          then
+            # matched compressor
+            header="${header:2}"
+            levelId="${header::1}"
+            header="${header:1}"
+            break
+          fi
+        done
+        ;;
+      *)
+        fatal "corrupted archive" "header is invalid"
+        ;;
+    esac
 
     # last 64 chars (sha256sum)
     catSum="${header: -64}"
     # remove checksum
     header="${header::-64}"
-  
+
     fileLengths=(${header//,/ })
   }
 
@@ -81,7 +91,7 @@ function extract()
     for length in ${fileLengths[@]}
     do
       _fileDigest "$(cat "$tmpAr" | head -n1)"
-      _removeLine 1
+      sed -i 1d "$tmpAr"
 
       fileName=/"$fileName"
       dirName=/"$dirName"
@@ -117,8 +127,7 @@ function extract()
   tail -n+$shLength "$0" >"$tmpAr"
 
   _headerDigest
-  # remove header
-  _removeLine 1
+  _removeChar $((headerLength+1))
 
   arSum="$(cat "$tmpAr" | sha256sum)"
   arSum="${arSum::64}"
