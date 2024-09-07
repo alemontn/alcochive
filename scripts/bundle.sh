@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-shLength=149
+shLength=151
 
 # this file is meant to be used when creating
 # the bundle for alcochive.
