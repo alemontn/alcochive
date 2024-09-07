@@ -3,6 +3,7 @@
 # exit on errors
 set -o "errexit"
 # extended globbing
+shopt -s "extglob"
 shopt -s "globstar"
 
 # colours & formatting :o
@@ -85,7 +86,7 @@ function headerDigest()
         if [ "$zHeader" == "${header::2}" ]
         then
           # matched compressor
-          header="${header:2}"
+          header="${header:3}"
           break
         fi
       done
@@ -295,6 +296,13 @@ function create()
   then
     headerId="alzr"
 
+    if [[ "$compressor" == *:+([0-9]) ]] ||
+       [[ "$compressor" == *:@("max"|"min") ]]
+    then
+      compressLevel=${compressor#*:}
+      compressor="${compressor%:*}"
+    fi
+
     if [ ! -f /lib/alcochive/compress.d/"$compressor" ]
     then
       fatal "$compressor" "unknown compressor"
@@ -302,7 +310,20 @@ function create()
 
     eval "$(</lib/alcochive/compress.d/"$compressor")"
 
-    headerId+="$zHeader"
+    levelId=D
+
+    if [ -n "$compressLevel" ]
+    then
+      levelId=S
+      case "$compressLevel" in
+        +([0-9])) :;;
+        "min") compressLevel=$fastestLevel levelId=N;;
+        "max") compressLevel=$bestLevel levelId=X;;
+        *) fatal "$compressLevel" "unknown compression level (range = $fastestLevel-$bestLevel)"
+      esac
+    fi
+
+    headerId+="$zHeader"$levelId
   fi
 
   tmpAr="$(mktemp /tmp/alcochive-create-XXXXXXX)"
@@ -396,10 +417,12 @@ function create()
     fileLoop+=1
   done
 
-  if [ -n "$compressor" ]
+  if [ -n "$compressor" ] && [ -n "$compressLevel" ]
   then
-    eval "$compressor" <"$tmpAr" >"$tmpAr".z && mv "$tmpAr".z "$tmpAr"
+    compressArgs="$setLevel"$compressLevel
   fi
+
+  eval "$compressor" "$compressArgs" <"$tmpAr" >"$tmpAr".z && mv "$tmpAr".z "$tmpAr"
 
   sum="$(cat "$tmpAr" | sha256sum)"
   sum="${sum::64}"
