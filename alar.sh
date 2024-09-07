@@ -11,6 +11,13 @@ red=$(echo -ne '\e[1;31m')
 none=$(echo -ne '\e[0m')
 bold=$(echo -ne '\e[1m')
 
+function cleanup()
+{
+  rm -f "$tmpAr"{,.tmp}
+}
+
+trap "cleanup" EXIT
+
 function errorContent()
 {
   for s in "$@"
@@ -23,7 +30,7 @@ function errorContent()
 
 function fatal()
 {
-  rm -f "$tmpAr"
+  cleanup
 
   echo $red"error (fatal):"$none "$(errorContent "$@")" >&2
   exit 1
@@ -328,7 +335,7 @@ function create()
 
   tmpAr="$(mktemp /tmp/alcochive-create-XXXXXXX)"
 
-  if [ ${#targets[@]} -le 1 ] && [ "${targets[@]}" == "." ]
+  if [ ${#targets[@]} -eq 1 ] && [ "${targets[@]}" == "." ]
   then
     targets=(**/*)
   fi
@@ -422,7 +429,11 @@ function create()
     compressArgs="$setLevel"$compressLevel
   fi
 
-  eval "$compressor" "$compressArgs" <"$tmpAr" >"$tmpAr".z && mv "$tmpAr".z "$tmpAr"
+  if [ -n "$compressor" ]
+  then
+    eval "$compressor" "$compressArgs" <"$tmpAr" >"$tmpAr".z &&
+     mv "$tmpAr".z "$tmpAr"
+  fi
 
   sum="$(cat "$tmpAr" | sha256sum)"
   sum="${sum::64}"
@@ -437,59 +448,59 @@ function create()
 
 function main()
 {
+  function _setOperation()
+  {
+    if [ -n "$operation" ]
+    then
+      fatal "invalid arguments" "conflicting arguments provided"
+    fi
+
+    export operation="$1"
+  }
+
+  function _seperateArg()
+  {
+    if [[ "$arg" == -[A-Za-z]+([A-Za-z]) ]]
+    then
+      arg="${arg#-}"
+
+      while [ ${#arg} -ne 0 ]
+      do
+        args+=("-${arg::1}")
+        arg="${arg:1}"
+      done
+    else
+      args+=("$arg")
+    fi
+  }
+
+  for arg in "$@"
+  do
+    _seperateArg
+  done
+
+  set -- "${args[@]}"
+  unset args
+
   while [ $# -ne 0 ]
   do
     case "$1" in
-      "--help"|"-h")
-        operation="usage"
-        ;;
-      "--version"|"-V")
-        operation="version"
-        ;;
-      "--extract"|"-x")
-        operation="extract"
-        ;;
-      "--create"|"-c")
-        operation="create"
-        ;;
-      "--list"|"-t")
-        operation="read"
-        ;;
-      "--verbose"|"-v")
-        verbose=true
-        ;;
-      "--dir="*)
-        directory="${1#--dir=}"
-        ;;
-      "-C"*)
-        shift
-        directory="$1"
-        ;;
-      "--compress="*)
-        compressor="${1##--compress=}"
-        ;;
-      "-z")
-        shift
-        compressor="$1"
-        ;;
-      "--stdout"|"-O")
-        stdout=true
-        ;;
-      "--overwrite")
-        overwrite=true
-        ;;
-      "--no-perms")
-        setPerms=false
-        ;;
-      "--no-owner")
-        setOwner=false
-        ;;
-      "--skip-sum")
-        skipSum=true
-        ;;
-      *)
-        targets+=("$1")
-        ;;
+      "--help"|"-h")    _setOperation "usage";;
+      "--version"|"-V") _setOperation "version";;
+      "--extract"|"-x") _setOperation "extract";;
+      "--create"|"-c")  _setOperation "create";;
+      "--list"|"-t")    _setOperation "read";;
+      "--verbose"|"-v") verbose=true;;
+      "--stdout"|"-O")  stdout=true;;
+      "--overwrite")    overwrite=true;;
+      "--no-perms")     setPerms=false;;
+      "--no-owner")     setOwner=false;;
+      "--skip-sum")     skipSum=true;;
+      "--dir="*)        directory="${1#--dir=}";;
+      "-C"*)            directory="$2"; shift;;
+      "--compress="*)   compressor="${1##--compress=}";;
+      "-z")             compressor="$2"; shift;;
+      *)                targets+=("$1");;
     esac
     # move on to next argument
     shift

@@ -18,9 +18,6 @@ fixed/implemented
 
 ### cli
 
- * arguments have to be seperated (e.g. `-x -C /`) when ideally
-   should be able to be put together (e.g. `-xC /`)
-
 ### more
 
  * add arch linux package
