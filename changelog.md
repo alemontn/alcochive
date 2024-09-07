@@ -11,3 +11,5 @@
  * refine compressed archives
 
  * add compression levels
+
+ * use faster, file-less method to read archives
