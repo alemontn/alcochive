@@ -1,5 +1,5 @@
 
-v0.0.2:
+### v0.0.2
 
  * add compression (gzip, zstd, lz4, brotli, xz)
 
@@ -9,3 +9,5 @@ v0.0.2:
    (--stdout / -C)
 
  * refine compressed archives
+
+ * add compression levels

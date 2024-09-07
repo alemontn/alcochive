@@ -47,6 +47,8 @@ function extract()
       fatal "unknown compressor" "only 'zs' (zstd) is supported"
     fi
     header="${header#zs}"
+    # remove compression level ID
+    header="${header:1}"
 
     # last 64 chars (sha256sum)
     catSum="${header: -64}"
