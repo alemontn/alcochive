@@ -2,6 +2,13 @@ name: Package
 
 on:
   push:
+    paths:
+      - alar.sh
+      - alcochive.control
+      - alcochive.spec
+      - compress.d/**
+      - scripts/**
+      - .github/workflows/package.yml
   workflow_dispatch:
 
 jobs:
