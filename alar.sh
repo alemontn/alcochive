@@ -134,13 +134,13 @@ function fileDigest()
 function removeLine()
 {
   rmLength=$1
-  cat "$tmpAr" | tail -n+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+  sed -i ${rmLength}d "$tmpAr"
 }
 
 function removeChar()
 {
   rmLength=$1
-  cat "$tmpAr" | tail -c+$((rmLength+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
+  tail -c+$((rmLength+1)) "$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
 }
 
 function read()
@@ -156,11 +156,17 @@ function read()
     eval "$decompress" <"$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
   fi
 
+  declare -i skipLength=0 \
+             skipLine=1
+
   for length in ${fileLengths[@]}
   do
-    fileDigest "$(cat "$tmpAr" | head -n1)"
-    removeLine 1
-    removeChar $length
+    if [ $skipLength -eq 1 ]
+    then
+      fileDigest "$(head -n1 "$tmpAr")"
+    else
+      fileDigest "$(tail -c+$((skipLength+1)) "$tmpAr" | head -n$((skipLine+1)) | head -n1)"
+    fi
 
     if [ "$verbose" == true ]
     then
@@ -168,9 +174,10 @@ function read()
     else
       echo "$fileName"
     fi
-  done
 
-  rm -f "$tmpAr"
+    skipLength+=$((${#fileInfo}+length+1))
+    skipLine+=1
+  done
 }
 
 function extract()
@@ -291,8 +298,6 @@ function extract()
   fi
 
   _fileSort
-
-  rm -f "$tmpAr"
 }
 
 function create()
@@ -442,8 +447,6 @@ function create()
 
   echo "$headerId$header$sum"
   cat "$tmpAr"
-
-  rm -f "$tmpAr"
 }
 
 function main()
@@ -526,6 +529,7 @@ function main()
   esac
 
   eval "$operation"
+  cleanup
 }
 
 main "$@"
