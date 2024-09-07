@@ -227,7 +227,7 @@ function extract()
       then
         if [ "${targets[@]}" == "$fileName" ]
         then
-          fileName=/dev/stdout _fileExtract
+          fileName=/dev/stdout _extract
           exit 0
         else
           removeChar $length
