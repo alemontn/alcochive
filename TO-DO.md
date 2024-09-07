@@ -3,7 +3,7 @@ targets are sorted from most to least concern, the
 higher the target is, the more likely it is to be
 fixed/implemented
 
-### FORMAT:
+### format
 
  * only files can be added, not directories
 
@@ -16,14 +16,11 @@ fixed/implemented
 
  * xattrs not yet implemented (no idea what they even are)
 
-### CLI:
-
- * creating a compressed archive means making lots of temporary
-   files which is very messy, need a smoother way of doing this
+### cli
 
  * arguments have to be seperated (e.g. `-x -C /`) when ideally
    should be able to be put together (e.g. `-xC /`)
 
-### MORE:
+### more
 
  * add arch linux package
