@@ -13,13 +13,20 @@ bold=$(echo -ne '\e[1m')
 
 function cleanup()
 {
-  if [ "${tmpAr::5}" == /tmp/ ]
+  if [[ "$tmpAr" == *.swp* ]]
   then
     rm -f "$tmpAr"{,.tmp}
   fi
 }
-
+# before exiting fully, remove tmp file
 trap "cleanup" EXIT
+
+function makeTmp()
+{
+  tmpAr=."$1".alar.swp
+
+  : >"$tmpAr" || fatal "failed to create temporary file (current directory: $PWD)"
+}
 
 function errorContent()
 {
@@ -69,6 +76,7 @@ ${bold}Arguments:${none}
      --no-owner   don't include or change file ownership
      --no-perms   don't include or change file permissions
      --skip-sum   skip archive integrity check (checksum) when extracting
+     --exclude    exclude file patterns
 "
   exit 0
 }
@@ -138,6 +146,20 @@ function fileDigest()
   fi
 }
 
+function matchExclude()
+{
+  ret=1
+  for excludeFile in "${exclude[@]}"
+  do
+    if [[ "$fileName" == $excludeFile ]]
+    then
+      ret=0
+    fi
+  done
+
+  return $ret
+}
+
 function removeChar()
 {
   rmLength=$1
@@ -178,9 +200,9 @@ function show()
   fi
 }
 
-function read()
+function readContents()
 {
-  tmpAr="$(mktemp /tmp/alcochive-read-XXXXXXX)"
+  makeTmp "in"
   cat >"$tmpAr"
 
   headerDigest
@@ -196,12 +218,7 @@ function read()
 
   for length in ${fileLengths[@]}
   do
-    if [ $skipLength -eq 1 ]
-    then
-      fileDigest "$(head -n1 "$tmpAr")"
-    else
-      fileDigest "$(tail -c+$((skipLength+1)) "$tmpAr" | head -n$((skipLine+1)) | head -n1)"
-    fi
+    fileDigest "$(tail -c+$((skipLength+1)) "$tmpAr" | head -n$((skipLine+1)) | head -n1)"
 
     if [ "$verbose" == true ]
     then
@@ -231,7 +248,7 @@ function extract()
     then
       fatal "$fileName" "cannot write to existing file (use '--overwrite')"
     else
-      cat "$tmpAr" | head -c$length >"$fileName"
+      tail -c+$((skipLength+1)) "$tmpAr" | tail -n+2 | head -c$length >"$fileName"
     fi
 
     if [ ! "$fileName" == /dev/stdout ]
@@ -268,37 +285,26 @@ function extract()
 
   function _fileSort()
   {
+    declare -i skipLength=0 \
+               skipLine=1
+
     for length in ${fileLengths[@]}
     do
-      fileDigest "$(cat "$tmpAr" | head -n1)"
-      sed -i 1d "$tmpAr"
+      fileDigest "$(tail -c+$((skipLength+1)) "$tmpAr" | head -n$((skipLine+1)) | head -n1)"
 
-      if [ "$stdout" == true ]
+      if [ "$stdout" == true ] && [ "${targets[@]}" == "$fileName" ]
       then
-        if [ "${targets[@]}" == "$fileName" ]
-        then
-          fileName=/dev/stdout _extract
-          exit 0
-        else
-          removeChar $length
-          continue
-        fi
+        fileName=/dev/stdout _extract
+        exit
       fi
 
-      if [ ${#targets[@]} -eq 0 ]
+      if [ ! "$stdout" == true ] && [ ${#targets[@]} -eq 0 ] || _matchTarget
       then
         _extract
-      else
-        if _matchTarget
-        then
-          _extract
-        else
-          removeChar $length
-          continue
-        fi
       fi
 
-      removeChar $length
+      skipLine+=1
+      skipLength+=$((${#fileInfo}+length+1))
     done
   }
 
@@ -307,7 +313,7 @@ function extract()
     cd "$directory"
   fi
 
-  tmpAr="$(mktemp /tmp/alcochive-extract-XXXXXXX)"
+  makeTmp "in"
   # copy stdin to temporary file
   cat >"$tmpAr"
 
@@ -371,22 +377,26 @@ function create()
     headerId+="$zHeader"$levelId
   fi
 
-  tmpAr="$(mktemp /tmp/alcochive-create-XXXXXXX)"
-
   if [ ${#targets[@]} -eq 1 ] && [ "${targets[@]}" == "." ]
   then
-    targets=(**/*)
+    if [ -f .out.alar.swp ]
+    then
+      fatal "invalid filename" "file cannot be called '.out.alar.swp'"
+    fi
+
+    targets=()
+    while read fileName
+    do
+      targets+=("$fileName")
+    done \
+      <<<"$(find -type f -print0 | xargs -0 ls -1)"
   fi
+
+  makeTmp "out"
 
   function _addFile()
   {
     fileLength=$(cat "$filePath" | wc -c)
-
-    if [ $fileLength -eq 0 ]
-    then
-      fatal "$fileName" "cannot add empty files to archive"
-    fi
-
     header+=$fileLength,
   }
 
@@ -408,6 +418,11 @@ function create()
 
     fileName="${fileName#./}"
 
+    if matchExclude
+    then
+      continue
+    fi
+
     fileBase="$(basename "$fileName")"
     filePerms=$(stat -c '%a' "$filePath")
     fileOwner="$(stat -c '%U:%G' "$filePath")"
@@ -420,6 +435,16 @@ function create()
       _addFile
     else
       fatal "$filePath" "no such file or directory"
+    fi
+
+    if [ "$setPerms" == false ]
+    then
+      filePerms=0000
+    fi
+
+    if [ "$setOwner" == false ]
+    then
+      fileOwner=
     fi
 
     if [ ${#filePerms} -eq 3 ]
@@ -484,16 +509,6 @@ function create()
 
 function main()
 {
-  function _setOperation()
-  {
-    if [ -n "$operation" ]
-    then
-      fatal "invalid arguments" "conflicting arguments provided"
-    fi
-
-    export operation="$1"
-  }
-
   function _seperateArg()
   {
     if [[ "$arg" == -[A-Za-z]+([A-Za-z]) ]]
@@ -510,6 +525,29 @@ function main()
     fi
   }
 
+  function _setOperation()
+  {
+    if [ -n "$operation" ]
+    then
+      fatal "invalid arguments" "conflicting arguments provided"
+    fi
+
+    export operation="$1"
+  }
+
+  function _setArgValue()
+  {
+    varName="$1"
+    varContent="${2##--*=}"
+
+    if [ "$3" == "-+" ]
+    then
+      eval "$varName+=('$varContent')"
+    else
+      eval "$varName='$varContent'"
+    fi
+  }
+
   for arg in "$@"
   do
     _seperateArg
@@ -521,23 +559,24 @@ function main()
   while [ $# -ne 0 ]
   do
     case "$1" in
-      "--help"|"-h")    _setOperation "usage";;
-      "--version"|"-V") _setOperation "version";;
-      "--extract"|"-x") _setOperation "extract";;
-      "--create"|"-c")  _setOperation "create";;
-      "--show"|"-q")    _setOperation "show";;
-      "--list"|"-t")    _setOperation "read";;
-      "--verbose"|"-v") verbose=true;;
-      "--stdout"|"-O")  stdout=true;;
-      "--overwrite")    overwrite=true;;
-      "--no-perms")     setPerms=false;;
-      "--no-owner")     setOwner=false;;
-      "--skip-sum")     skipSum=true;;
-      "--dir="*)        directory="${1#--dir=}";;
-      "-C"*)            directory="$2"; shift;;
-      "--compress="*)   compressor="${1##--compress=}";;
-      "-z")             compressor="$2"; shift;;
-      *)                targets+=("$1");;
+      "--help"|"-h")     _setOperation "usage";;
+      "--version"|"-V")  _setOperation "version";;
+      "--extract"|"-x")  _setOperation "extract";;
+      "--create"|"-c")   _setOperation "create";;
+      "--show"|"-q")     _setOperation "show";;
+      "--list"|"-t")     _setOperation "readContents";;
+      "--dir="*)         _setArgValue "dirName" "$1";;
+      "--compress="*)    _setArgValue "compressor" "$1";;
+      "--exclude="*)     _setArgValue "exclude" "$1" -+;;
+      "-C")              directory="$2"; shift;;
+      "-z")              compressor="$2"; shift;;
+      "--verbose"|"-v")  verbose=true;;
+      "--stdout"|"-O")   stdout=true;;
+      "--overwrite")     overwrite=true;;
+      "--no-perms")      setPerms=false;;
+      "--no-owner")      setOwner=false;;
+      "--skip-sum")      skipSum=true;;
+      *)                 targets+=("$1");;
     esac
     # move on to next argument
     shift
@@ -554,7 +593,7 @@ function main()
   fi
 
   case "$operation" in
-    "extract"|"read")
+    "extract"|"readContents")
       if [ -t 0 ]
       then
         fatal "cannot read input" "stdin is a tty"

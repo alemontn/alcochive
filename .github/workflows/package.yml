@@ -6,6 +6,7 @@ on:
       - alar.sh
       - alcochive.control
       - alcochive.spec
+      - alcochive.pkgbuild
       - compress.d/**
       - scripts/**
       - .github/workflows/package.yml
@@ -33,18 +34,22 @@ jobs:
       - name: make fedora package
         run: |
           cd ~/alcochive
-          sudo rm -rf build
           ./scripts/package.sh rpm
-          mv build/out/*.rpm ~/out
+          mv build/out/*.rpm ~/out/alcochive.rpm
+          cp build/*.log ~/log
+
+      - name: make arch package
+        run: |
+          cd ~/alcochive
+          ./scripts/package.sh arch
+          mv build/out/*.pkg.tar.zst ~/out/alcochive.pkg.tar.zst
           cp build/*.log ~/log
 
       - name: make bundle
         run: |
           cd ~/alcochive
-          sudo rm -rf build
           ./scripts/package.sh bundle
-          mv build/out/alcochive.bundle ~/out
-          mv build/out/alcochive.alzr ~/out
+          mv build/out/* ~/out
           cp build/*.log ~/log
 
       - name: upload logs

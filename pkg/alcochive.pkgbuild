@@ -1,0 +1,17 @@
+# Maintainer: alemontn <20985102-alemontn@users.noreply.gitlab.com>
+pkgname=alcochive
+pkgver=0.0.2
+pkgrel=1
+pkgdesc="an archiver written in bash"
+arch=(any)
+url="https://github.com/alemontn/$pkgname"
+license=('GPL-3.0-or-later')
+depends=(bash sed coreutils binutils)
+source=("$pkgname-$pkgver.tar.gz")
+noextract=()
+sha256sums=('SKIP')
+
+package() {
+  cd "$srcdir"
+  cp -a usr "${pkgdir}"
+}

@@ -70,7 +70,7 @@ function makeDebianPkg()
   mkdir -pm755 deb/build/DEBIAN
 
   # debian control file
-  cp "$buildDir"/source/alcochive.control deb/build/DEBIAN/control
+  cp "$buildDir"/source/pkg/alcochive.control deb/build/DEBIAN/control
   # copy everything that is neede for packaging
   cp -a "$buildDir"/ar/* deb/build
 
@@ -89,7 +89,7 @@ function makeFedoraPkg()
   mkdir -pm755 rpm/rpmbuild
   mkdir rpm/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-  cp "$buildDir"/source/alcochive.spec rpm/rpmbuild/SPECS/
+  cp "$buildDir"/source/pkg/alcochive.spec rpm/rpmbuild/SPECS/
 
   cd "$buildDir"/rpm
 
@@ -104,6 +104,24 @@ function makeFedoraPkg()
   mv ./RPMS/noarch/*.rpm "$buildDir"/out/
 }
 
+function makeArchPkg()
+{
+  echo "building arch package"
+  structures
+
+  mkdir -m755 arch
+
+  cd "$buildDir"/ar
+  tar -H "ustar" -c . | gzip -1 >"$buildDir"/arch/alcochive-$version.tar.gz
+
+  cd "$buildDir"/arch
+
+  cp "$buildDir"/source/pkg/alcochive.pkgbuild PKGBUILD
+  makepkg -s
+
+  mv *.pkg.tar.zst "$buildDir"/out/alcochive.pkg.tar.zst
+}
+
 function makeBundle()
 {
   echo "building bundle"
@@ -116,7 +134,7 @@ function makeBundle()
   # so don't try to change this to anything else like
   # gzip or xz
 
-  "$buildDir"/source/alar.sh -z zstd -c . -v \
+  sudo "$buildDir"/source/alar.sh -z zstd -c . -v \
     >"$buildDir"/out/alcochive.alzr \
     2>"$buildDir"/alar.log
 
@@ -134,6 +152,9 @@ case "${1,,}" in
     ;;
   "rpm")
     makeFedoraPkg
+    ;;
+  "arch")
+    makeArchPkg
     ;;
   "bundle")
     makeBundle

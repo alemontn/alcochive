@@ -3,7 +3,7 @@
 
  * add compression (gzip, zstd, lz4, brotli, xz)
 
- * add fedora (rpm) package
+ * add fedora (rpm) and arch linux packages
 
  * add option to output a single file's contents to stdout
    (--stdout / -C)
