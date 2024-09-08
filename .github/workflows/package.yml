@@ -1,12 +1,10 @@
-name: Package
+name: package
 
 on:
   push:
     paths:
       - alar.sh
-      - alcochive.control
-      - alcochive.spec
-      - alcochive.pkgbuild
+      - pkg/**
       - compress.d/**
       - scripts/**
       - .github/workflows/package.yml
@@ -19,6 +17,9 @@ jobs:
 
       - name: clone repo
         run: git clone https://github.com/alemontn/alcochive.git ~/alcochive
+
+      - name: install dependencies
+        run: sudo apt -y install makepkg
 
       - name: make debian package
         run: |
