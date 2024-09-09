@@ -18,7 +18,10 @@ jobs:
         run: git clone https://github.com/alemontn/alcochive.git ~/alcochive
 
       - name: install dependencies
-        run: sudo apt -y install pacman-package-manager
+        run: |
+          sudo apt update
+          sudo apt -y upgrade
+          sudo apt -y install pacman-package-manager
 
       - name: make debian package
         run: |
