@@ -160,12 +160,6 @@ function matchExclude()
   return $ret
 }
 
-function removeChar()
-{
-  rmLength=$1
-  tail -c+$(($1+1)) "$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
-}
-
 function show()
 {
   tmpAr=/dev/stdin headerDigest
@@ -203,17 +197,17 @@ function show()
 function readContents()
 {
   makeTmp "in"
+  # save stdin to tmp file
   cat >"$tmpAr"
 
   headerDigest
-  removeChar $((headerLength+1))
 
   if [ -n "$decompress" ]
   then
     eval "$decompress" <"$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
   fi
 
-  declare -i skipLength=0 \
+  declare -i skipLength=$((headerLength+1)) \
              skipLine=1
 
   for length in ${fileLengths[@]}
@@ -285,9 +279,6 @@ function extract()
 
   function _fileSort()
   {
-    declare -i skipLength=0 \
-               skipLine=1
-
     for length in ${fileLengths[@]}
     do
       fileDigest "$(tail -c+$((skipLength+1)) "$tmpAr" | head -n$((skipLine+1)) | head -n1)"
@@ -318,11 +309,13 @@ function extract()
   cat >"$tmpAr"
 
   headerDigest
-  removeChar $((headerLength+1))
+
+  declare -i skipLength=$((headerLength+1)) \
+             skipLine=1
 
   if [ ! "$skipSum" == true ]
   then
-    arSum="$(cat "$tmpAr" | sha256sum)"
+    arSum="$(tail -c+$((skipLength+1)) "$tmpAr" | sha256sum)"
     arSum="${arSum::64}"
 
     if [ ! "$arSum" == "$catSum" ]
