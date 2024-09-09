@@ -14,12 +14,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-
       - name: clone repo
         run: git clone https://github.com/alemontn/alcochive.git ~/alcochive
 
       - name: install dependencies
-        run: sudo apt -y install makepkg
+        run: sudo apt -y install pacman-package-manager
 
       - name: make debian package
         run: |
