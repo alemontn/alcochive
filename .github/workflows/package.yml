@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - alar.sh
-      - pkg/**
+      - package.conf
       - compress.d/**
       - scripts/**
       - .github/workflows/package.yml
@@ -22,6 +22,11 @@ jobs:
           sudo apt update
           sudo apt -y upgrade
           sudo apt -y install pacman-package-manager
+
+      - name: generate package specs
+        run: |
+          cd ~/alcochive
+          ./scripts/spec.sh
 
       - name: make debian package
         run: |

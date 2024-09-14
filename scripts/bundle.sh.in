@@ -1,21 +1,8 @@
-#!/usr/bin/env bash
-shLength=160
 
 # this file is meant to be used when creating
 # the bundle for alcochive.
 # do not use it in its standalone form, it
 # won't work.
-
-set -o "errexit"
-
-function fatal()
-{
-  local red=$(echo -ne '\e[1;31m') \
-        none=$(echo -ne '\e[0m')
-
-  echo $red"error (fatal):"$none "$@"
-  exit 1
-}
 
 function extract()
 {
@@ -41,19 +28,11 @@ function extract()
       "alzr")
         header="${header#alzr}"
 
-        for compressTemplate in /lib/alcochive/compress.d/*
-        do
-          eval "$(<"$compressTemplate")"
-
-          if [ "$zHeader" == "${header::2}" ]
-          then
-            # matched compressor
-            header="${header:2}"
-            levelId="${header::1}"
-            header="${header:1}"
-            break
-          fi
-        done
+        if [ ! "${header::2}" == "zs" ]
+        then
+          fatal "${header::2}" "unknown compressor header - only Zstandard ('zs') is supported"
+        fi
+        header="${header:3}"
         ;;
       *)
         fatal "corrupted archive" "header is invalid"

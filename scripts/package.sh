@@ -1,27 +1,13 @@
 #!/usr/bin/env bash
 
-# what version are we packaging for?
-version=0.0.2
+# source common code for scripts
+. "./scripts/common.sh.in"
+. "./package.conf"
 
-set -o "errexit"
-
-function fatal()
-{
-  local red=$(echo -ne '\e[1;31m') \
-        none=$(echo -ne '\e[0m')
-
-  echo $red"error (fatal):"$none "$@"
-  exit 1
-}
+gitRequired
 
 function structures()
 {
-  # git repos will always have the '.git' directory
-  if [ ! -d .git ]
-  then
-    fatal "this command must be ran in the root of the git repo"
-  fi
-
   # the script has already been ran once before
   if [ -d build ]
   then
@@ -138,25 +124,40 @@ function makeBundle()
     >"$buildDir"/out/alcochive.alzr \
     2>"$buildDir"/alar.log
 
+  declare -i shLength
+
+  shLength=$(wc -l "$buildDir/source/scripts/common.sh.in" | cut -d' ' -f1)
+  shLength+=$(wc -l "$buildDir"/source/scripts/bundle.sh.in | cut -d' ' -f1)
+  shLength+=3
+
+  # shebang to make sure we are running from bash
+  echo "#!/usr/bin/env bash" >"$buildDir"/out/alcochive.bundle
+  echo "shLength=$shLength" >>"$buildDir"/out/alcochive.bundle
+
   # join bundle & archive
-  cat "$buildDir"/source/scripts/bundle.sh \
+  cat "$buildDir"/source/scripts/common.sh.in \
+      "$buildDir"/source/scripts/bundle.sh.in \
       "$buildDir"/out/alcochive.alzr \
-        >"$buildDir"/out/alcochive.bundle
+        >>"$buildDir"/out/alcochive.bundle
 
   chmod +x "$buildDir"/out/alcochive.bundle
 }
 
 case "${1,,}" in
   "deb")
+    fileRequired "./pkg/alcochive.control"
     makeDebianPkg
     ;;
   "rpm")
+    fileRequired "./pkg/alcochive.spec"
     makeFedoraPkg
     ;;
   "arch")
+    fileRequired "./pkg/alcochive.pkgbuild"
     makeArchPkg
     ;;
   "bundle")
+    fileRequired "./scripts/bundle.sh.in"
     makeBundle
     ;;
 esac

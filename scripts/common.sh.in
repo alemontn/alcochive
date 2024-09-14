@@ -1,0 +1,62 @@
+
+# exit on errors
+set -o "errexit"
+
+# base script name
+progName="${0##*/}" progName="${progName%.sh}"
+
+function fatal()
+{
+  function _errorContent()
+  {
+    for s in "$@"
+    do
+      content+="$s: "
+    done
+
+    content="${content%: }"
+    echo -n "$content"
+  }
+
+  local red=$(echo -ne '\e[1;31m')
+  local none=$(echo -ne '\e[0m')
+
+  echo "$progName:" $red"error:"$none "$(_errorContent "$@")"
+  exit 1
+}
+
+function contains()
+{
+  matchTerm="$1"; shift
+
+  ret=1
+  for searchTerm in "$@"
+  do
+    if [ "$matchTerm" == "$searchTerm" ]
+    then
+      ret=0
+    fi
+  done
+
+  return $ret
+}
+
+function fileRequired()
+{
+  for file in "$@"
+  do
+    if [ ! -f "$file" ]
+    then
+      fatal "$file" "required file is missing"
+    fi
+  done
+}
+
+function gitRequired()
+{
+  # git repos will always have the '.git' directory
+  if [ ! -d .git ]
+  then
+    fatal "this command must be ran in the root of the git repo"
+  fi
+}

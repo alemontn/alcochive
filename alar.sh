@@ -11,6 +11,9 @@ red=$(echo -ne '\e[1;31m')
 none=$(echo -ne '\e[0m')
 bold=$(echo -ne '\e[1m')
 
+# name of what alcochive is being ran from
+progName="${0##*'/'}"
+
 function cleanup()
 {
   if [[ "$tmpAr" == *.swp* ]]
@@ -42,7 +45,7 @@ function fatal()
 {
   cleanup
 
-  echo $red"error (fatal):"$none "$(errorContent "$@")" >&2
+  echo "$progName:" $red"error:"$none "$(errorContent "$@")" >&2
   exit 1
 }
 
@@ -57,7 +60,7 @@ function usage()
   compressors="${compressors%|}"
 
   echo "\
-Usage: ${0##*/} <OPERATION> [ARGUMENTs] [TARGETs]
+Usage: $progName <OPERATION> [ARGUMENTs] [TARGETs]
 
 ${bold}Operations:${none}
  -h, --help       show this help prompt
@@ -389,7 +392,7 @@ function create()
 
   function _addFile()
   {
-    fileLength=$(cat "$filePath" | wc -c)
+    fileLength=$(wc -c "$filePath" | cut -d' ' -f1)
     header+=$fileLength,
   }
 
@@ -491,7 +494,7 @@ function create()
      mv "$tmpAr".z "$tmpAr"
   fi
 
-  sum="$(cat "$tmpAr" | sha256sum)"
+  sum="$(sha256sum "$tmpAr" | cut -d' ' -f1)"
   sum="${sum::64}"
 
   header="${header%,}"
