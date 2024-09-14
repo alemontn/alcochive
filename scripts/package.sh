@@ -32,6 +32,7 @@ function structures()
   mkdir -p usr/lib/alcochive/compress.d
 
   install -m755 "$buildDir"/source/alar.sh usr/bin/alar
+  install -m755 "$buildDir"/source/scripts/common.sh.in usr/lib/alcochive/common.sh
 
   for compress in "$buildDir"/source/compress.d/*
   do
@@ -110,6 +111,16 @@ function makeArchPkg()
 
 function makeBundle()
 {
+  function _rd()
+  {
+    echo "$@" >>"$buildDir"/out/alcochive.bundle
+  }
+
+  function _addFileLength()
+  {
+    shLength+=$(wc -l "$buildDir"/source/"$1" | cut -d' ' -f1)
+  }
+
   echo "building bundle"
   structures
 
@@ -124,15 +135,26 @@ function makeBundle()
     >"$buildDir"/out/alcochive.alzr \
     2>"$buildDir"/alar.log
 
-  declare -i shLength
+  declare -i shLength=0
 
-  shLength=$(wc -l "$buildDir/source/scripts/common.sh.in" | cut -d' ' -f1)
-  shLength+=$(wc -l "$buildDir"/source/scripts/bundle.sh.in | cut -d' ' -f1)
-  shLength+=3
+  _addFileLength "scripts/common.sh.in"
+  _addFileLength "scripts/bundle.sh.in"
+  _addFileLength "package.conf"
+
+  shLength+=11
 
   # shebang to make sure we are running from bash
-  echo "#!/usr/bin/env bash" >"$buildDir"/out/alcochive.bundle
-  echo "shLength=$shLength" >>"$buildDir"/out/alcochive.bundle
+  _rd "#!/usr/bin/env bash"
+  _rd
+  _rd "shLength=$shLength"
+  _rd "rmList=(${fileList[@]})"
+  _rd
+  _rd 'function spec()'
+  _rd '{'
+  _rd '  cat <<EOL'
+  _rd "$(<"$buildDir"/source/package.conf)"
+  _rd 'EOL'
+  _rd '}'
 
   # join bundle & archive
   cat "$buildDir"/source/scripts/common.sh.in \

@@ -4,40 +4,23 @@
 # do not use it in its standalone form, it
 # won't work.
 
-function extract()
+function install()
 {
-  function _removeLine()
-  {
-    cat "$tmpAr" | tail -n+$(($1+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
-  }
-
-  function _removeChar()
-  {
-    cat "$tmpAr" | tail -c+$(($1+1)) >"$tmpAr".tmp && mv "$tmpAr".tmp "$tmpAr"
-  }
+  if ! command -v "zstd" &>/dev/null
+  then
+    fatal "zstd" "command not found"
+  fi
 
   function _headerDigest()
   {
     header="$(head -n1 "$tmpAr" | cut -d'>' -f1)"
     headerLength=${#header}
 
-    case "${header::4}" in
-      "alar")
-        header="${header#alar}"
-        ;;
-      "alzr")
-        header="${header#alzr}"
-
-        if [ ! "${header::2}" == "zs" ]
-        then
-          fatal "${header::2}" "unknown compressor header - only Zstandard ('zs') is supported"
-        fi
-        header="${header:3}"
-        ;;
-      *)
-        fatal "corrupted archive" "header is invalid"
-        ;;
-    esac
+    if [ ! "${header::6}" == "alzrzs" ]
+    then
+      fatal "bundle is corrupted" "invalid header"
+    fi
+    header="${header:7}"
 
     # last 64 chars (sha256sum)
     catSum="${header: -64}"
@@ -50,18 +33,53 @@ function extract()
   function _fileDigest()
   {
     fileInfo="$1"
-  
+
     filePerms="${fileInfo::4}"
     fileOwner="${fileInfo:4}"
-      fileOwner="${fileOwner%)*}"
+      fileOwner="${fileOwner%%)*}"
       fileOwner="${fileOwner#(}"
     fileName="${fileInfo#$filePerms($fileOwner)}"
-  
+
     if [[ "$fileName" == */* ]]
     then
       dirName="${fileName%/*}"
+      fileBase="$(basename "$fileName")"
     else
       unset dirName
+      fileBase="$fileName"
+    fi
+  }
+
+  function _extract()
+  {
+    fileName=/"$fileName"
+    dirName=/"$dirName"
+
+    if [ -n "$dirName" ]
+    then
+      mkdir -p "$dirName"
+    fi
+
+    if [ "${fileName: -1}" == / ]
+    then
+      mkdir -p "$fileName"
+    else
+      tail -c+$((skipLength+1)) "$tmpAr" | tail -n+2 | head -c$length >"$fileName"
+    fi
+
+    if [ ! "$fileName" == /dev/stdout ]
+    then
+      if [ ! "$filePerms" == 0000 ] && [ ! "$setPerms" == false ]
+      then
+        chmod -R "$filePerms" "$fileName"
+      fi
+
+      if [ -n "$fileOwner" ] && [ ! "$setOwner" == false ]
+      then
+        chown -R "$fileOwner" "$fileName"
+      fi
+
+      echo "x $fileName" >&2
     fi
   }
 
@@ -69,70 +87,81 @@ function extract()
   {
     for length in ${fileLengths[@]}
     do
-      _fileDigest "$(cat "$tmpAr" | head -n1)"
-      sed -i 1d "$tmpAr"
+      _fileDigest "$(tail -c+$((skipLength+1)) "$tmpAr" | head -n$((skipLine+1)) | head -n1)"
+      _extract
 
-      fileName=/"$fileName"
-      dirName=/"$dirName"
-
-      if [ -n "$dirName" ]
-      then
-        mkdir -p "$dirName"
-      fi
-
-      if [ "${fileName: -1}" == / ]
-      then
-        mkdir -p "$fileName"
-      else
-        cat "$tmpAr" | head -c$length >"$fileName"
-      fi
-
-      if [ ! "$filePerms" == 0000 ]
-      then
-        chmod -R "$filePerms" "$fileName"
-      fi
-
-      if [ -n "$fileOwner" ]
-      then
-        chown -R "$fileOwner" "$fileName"
-      fi
-
-      _removeChar $length
+      skipLine+=1
+      skipLength+=$((${#fileInfo}+length+1))
     done
   }
 
-  tmpAr="$(mktemp /tmp/alcochive-extract-XXXXXXX)"
-
+  tmpAr=.in.alar.swp
+  # copy stdin to temporary file
   tail -n+$shLength "$0" >"$tmpAr"
 
   _headerDigest
-  _removeChar $((headerLength+1))
 
-  arSum="$(cat "$tmpAr" | sha256sum)"
-  arSum="${arSum::64}"
+  declare -i skipLength=$((headerLength+1)) \
+             skipLine=1
+
+  arSum="$(tail -c+$((headerLength+2)) "$tmpAr" | sha256sum)" arSum="${arSum::64}"
 
   if [ ! "$arSum" == "$catSum" ]
   then
-    fatal "corrupted archive" "checksum (sha256) mismatch"
+    echo "arSum = $arSum; catSum = $catSum" >&2
+    fatal "bundle is corrupted" "checksum (sha256) mismatch"
   fi
 
-  unzstd <"$tmpAr" >"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
+  head -c$((headerLength+1)) "$tmpAr" >"$tmpAr".new
+  tail -c+$((headerLength+2)) "$tmpAr" | unzstd >>"$tmpAr".new && mv "$tmpAr".new "$tmpAr"
 
-  # extract files
   _fileSort
-
-  rm -f "$tmpAr"
 }
 
-if [ ! -w / ]
-then
-  fatal "write permission to root denied"
-fi
+function uninstall()
+{
+  for fileName in "${rmList[@]}"
+  do
+    fileName=/"$fileName"
 
-if ! command -v zstd > /dev/null
-then
-  fatal "zstd must be installed for decompression"
-fi
+    rm -rf "$fileName"
+    echo "rm $fileName" >&2
+  done
+}
 
-extract
+function version()
+{
+  # source package spec
+  eval "$(spec)"
+
+  echo $bold"alcochive"$none "version" $version >&2
+  exit
+}
+
+case "$1" in
+  "--help")
+    echo "Usage: $0 [OPERATION]"
+    echo
+    echo $bold"Operations:"$none
+    echo " --install    extract bundle contents to root"
+    echo " --uninstall  remove all files from bundle"
+    echo " --help       show this help prompt"
+    echo " --version    show version of bundle"
+    echo
+    exit
+    ;;
+  ""|"--install")
+    install
+    ;;
+  "--uninstall")
+    uninstall
+    ;;
+  "--version")
+    version
+    ;;
+  *)
+    fatal "$1" "unknown argument" "use '--help' for more information"
+    ;;
+esac
+
 exit

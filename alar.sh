@@ -1,52 +1,34 @@
 #!/usr/bin/env bash
 
-# exit on errors
-set -o "errexit"
+if [ -f /lib/alcochive/common.sh ]
+then
+  libPath=/lib
+elif [ -n "$LD_LIBRARY_PATH" ]
+then
+  for _libPath in "${LD_LIBRARY_PATH//:/ }"
+  do
+    if [ -f "$_libPath"/alcochive/common.sh ]
+    then
+      libPath="$_libPath"
+    fi
+  done
+else
+  exit 1
+fi
+. "$libPath/alcochive/common.sh"
+
 # extended globbing
 shopt -s "extglob"
 shopt -s "globstar"
 
-# colours & formatting :o
-red=$(echo -ne '\e[1;31m')
-none=$(echo -ne '\e[0m')
-bold=$(echo -ne '\e[1m')
-
 # name of what alcochive is being ran from
 progName="${0##*'/'}"
-
-function cleanup()
-{
-  if [[ "$tmpAr" == *.swp* ]]
-  then
-    rm -f "$tmpAr"{,.tmp}
-  fi
-}
-# before exiting fully, remove tmp file
-trap "cleanup" EXIT
 
 function makeTmp()
 {
   tmpAr=."$1".alar.swp
 
   : >"$tmpAr" || fatal "failed to create temporary file (current directory: $PWD)"
-}
-
-function errorContent()
-{
-  for s in "$@"
-  do
-    content+="$s: "
-  done
-  content="${content%: }"
-  echo -n "$content"
-}
-
-function fatal()
-{
-  cleanup
-
-  echo "$progName:" $red"error:"$none "$(errorContent "$@")" >&2
-  exit 1
 }
 
 function usage()
@@ -262,7 +244,7 @@ function extract()
 
       if [ "$verbose" == true ]
       then
-        echo "$fileName"
+        echo "$fileName" >&2
       fi
     fi
   }

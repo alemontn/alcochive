@@ -1,9 +1,29 @@
 
+# common code for alcochive
+# this is seperated from the main script
+# since it contains functions and definitions
+# used by other components as well
+
+# colours & formatting :o
+red=$(echo -ne '\e[1;31m')
+none=$(echo -ne '\e[0m')
+bold=$(echo -ne '\e[1m')
+
 # exit on errors
 set -o "errexit"
 
 # base script name
 progName="${0##*/}" progName="${progName%.sh}"
+
+function cleanup()
+{
+  if [[ "$tmpAr" == *.swp* ]]
+  then
+    rm -f "$tmpAr"{,.tmp}
+  fi
+}
+# before exiting fully, remove tmp file
+trap "cleanup" EXIT
 
 function fatal()
 {
@@ -18,9 +38,7 @@ function fatal()
     echo -n "$content"
   }
 
-  local red=$(echo -ne '\e[1;31m')
-  local none=$(echo -ne '\e[0m')
-
+  cleanup
   echo "$progName:" $red"error:"$none "$(_errorContent "$@")"
   exit 1
 }
